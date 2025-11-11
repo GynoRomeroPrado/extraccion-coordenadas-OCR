@@ -36,12 +36,18 @@ env/
 
 # Jupyter
 .ipynb_checkpoints/
+# Allow notebooks in notebooks/ directory but ignore everywhere else
 *.ipynb
+!notebooks/*.ipynb
 
 # Output
 output/
 *.pdf
-*.json
+# Block JSON output files but allow examples
+output/**/*.json
+batch_statistics.json
+checkpoint.json
+validation_report.json
 
 # Logs
 *.log
