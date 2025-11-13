@@ -5,6 +5,14 @@ opencv-python==4.8.1.78
 Pillow==10.1.0
 pdf2image==1.16.3
 
+# ==================== GPU-Accelerated OCR (Optional but Recommended) ====================
+# Para GPU (CUDA): paddlepaddle-gpu
+# Para CPU: paddlepaddle
+# Instalar según tu hardware:
+# - Con GPU: pip install paddlepaddle-gpu paddleocr
+# - Sin GPU: pip install paddlepaddle paddleocr
+paddleocr>=2.7.0
+
 # ==================== Numerical Processing ====================
 numpy==1.24.3
 
