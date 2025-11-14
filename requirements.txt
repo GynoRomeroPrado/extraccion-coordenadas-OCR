@@ -1,16 +1,22 @@
 # ==================== Core OCR and PDF Processing ====================
-pytesseract==0.3.10
+# NOTA: Ahora usamos PaddleOCR en lugar de Tesseract (más rápido y mejor para español)
+# pytesseract ya no es necesario - REMOVIDO
 PyMuPDF==1.23.8
 opencv-python==4.8.1.78
 Pillow==10.1.0
 pdf2image==1.16.3
 
-# ==================== GPU-Accelerated OCR (Optional but Recommended) ====================
-# Para GPU (CUDA): paddlepaddle-gpu
-# Para CPU: paddlepaddle
-# Instalar según tu hardware:
-# - Con GPU: pip install paddlepaddle-gpu paddleocr
-# - Sin GPU: pip install paddlepaddle paddleocr
+# ==================== PaddleOCR - OCR Engine Principal ====================
+# PaddleOCR es más rápido y preciso que Tesseract, especialmente para español
+# Instalación según hardware:
+#
+# OPCIÓN 1 - Con GPU (RECOMENDADO para Google Colab):
+#   pip install paddlepaddle-gpu paddleocr
+#
+# OPCIÓN 2 - Solo CPU:
+#   pip install paddlepaddle paddleocr
+#
+# NOTA: En Google Colab con GPU T4, usar siempre paddlepaddle-gpu para 10-50x speedup
 paddleocr>=2.7.0
 
 # ==================== Numerical Processing ====================

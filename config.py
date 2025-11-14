@@ -16,11 +16,11 @@ class Config:
     # DPI para conversión de PDF a imagen
     DPI = 300
 
-    # Idioma para Tesseract OCR
-    TESSERACT_LANG = "spa"  # Español
-
-    # Configuración de Tesseract
-    TESSERACT_CONFIG = "--oem 3 --psm 6"  # LSTM OCR Engine + Assume uniform block of text
+    # NOTA: Ahora se usa PaddleOCR en lugar de Tesseract
+    # PaddleOCR configura idioma automáticamente en el constructor
+    # Estas configuraciones se mantienen para compatibilidad legacy
+    TESSERACT_LANG = "spa"  # Español (legacy - no usado)
+    TESSERACT_CONFIG = "--oem 3 --psm 6"  # legacy - no usado
 
     # ==================== MATCHING ====================
     # Umbral mínimo de similitud para fuzzy matching (0-100)

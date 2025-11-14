@@ -1,16 +1,16 @@
 """
-Extractor OCR usando Tesseract
+Extractor OCR usando PaddleOCR
 
 Extrae texto y coordenadas de PDFs escaneados (imágenes)
-utilizando Tesseract OCR.
+utilizando PaddleOCR (más rápido y preciso que Tesseract).
 """
 import logging
 from typing import List, Dict
-import pytesseract
+from paddleocr import PaddleOCR
 from PIL import Image
 import fitz  # PyMuPDF
 from pathlib import Path
-import pandas as pd
+import numpy as np
 
 from config import Config
 
@@ -20,25 +20,44 @@ logger = logging.getLogger(__name__)
 
 class OCRExtractor:
     """
-    Extractor OCR usando Tesseract
+    Extractor OCR usando PaddleOCR
 
     Convierte páginas PDF a imágenes y aplica OCR para extraer
     texto con coordenadas y confianza.
+
+    PaddleOCR ventajas sobre Tesseract:
+    - Mejor soporte para español
+    - Mayor precisión en facturas
+    - No requiere archivos de datos externos
+    - Más rápido en CPU y GPU
     """
 
-    def __init__(self, dpi: int = 300):
+    def __init__(self, dpi: int = 300, use_gpu: bool = False):
         """
         Args:
             dpi: Resolución para conversión de PDF a imagen
+            use_gpu: Usar GPU para acelerar OCR (requiere paddlepaddle-gpu)
         """
         self.dpi = dpi
         self.bbox_scale = Config.BBOX_SCALE
-        self.tesseract_lang = Config.TESSERACT_LANG
-        self.tesseract_config = Config.TESSERACT_CONFIG
+        self.use_gpu = use_gpu
+
+        # Inicializar PaddleOCR
+        try:
+            self.ocr = PaddleOCR(
+                use_angle_cls=True,  # Detectar orientación de texto
+                lang='es',           # Español
+                use_gpu=use_gpu,
+                show_log=False       # No mostrar logs de PaddleOCR
+            )
+            logger.info(f"PaddleOCR inicializado (GPU: {use_gpu})")
+        except Exception as e:
+            logger.error(f"Error al inicializar PaddleOCR: {e}")
+            raise
 
     def extract(self, pdf_path: str, page_num: int = 0) -> List[Dict]:
         """
-        Extrae palabras con coordenadas usando OCR
+        Extrae palabras con coordenadas usando PaddleOCR
 
         Args:
             pdf_path: Ruta al archivo PDF
@@ -68,40 +87,49 @@ class OCRExtractor:
             # Convertir página a imagen
             image = self._pdf_page_to_image(pdf_path, page_num)
 
-            # Aplicar OCR
-            ocr_data = pytesseract.image_to_data(
-                image,
-                lang=self.tesseract_lang,
-                config=self.tesseract_config,
-                output_type=pytesseract.Output.DATAFRAME
-            )
-
-            # Filtrar filas con texto
-            ocr_data = ocr_data[ocr_data['text'].notna()]
-            ocr_data = ocr_data[ocr_data['text'].str.strip() != '']
-
             # Obtener dimensiones de la imagen
             img_width, img_height = image.size
 
+            # Convertir PIL Image a numpy array (requerido por PaddleOCR)
+            img_array = np.array(image)
+
+            # Aplicar OCR con PaddleOCR
+            ocr_result = self.ocr.ocr(img_array, cls=True)
+
             # Formatear palabras
             result = []
-            for _, row in ocr_data.iterrows():
-                text = str(row['text']).strip()
+
+            if ocr_result is None or len(ocr_result) == 0:
+                logger.warning(f"PaddleOCR no encontró texto en página {page_num}")
+                return result
+
+            # ocr_result[0] es una lista de líneas detectadas
+            for line in ocr_result[0]:
+                if line is None:
+                    continue
+
+                # Cada línea es: [bbox_poligonal, (text, confidence)]
+                bbox_poly = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                text_info = line[1]  # (texto, confidence)
+
+                text = text_info[0].strip()
+                confidence = float(text_info[1])
+
                 if not text:
                     continue
 
-                # Coordenadas originales
-                x0 = row['left']
-                y0 = row['top']
-                width = row['width']
-                height = row['height']
-                x1 = x0 + width
-                y1 = y0 + height
+                # Convertir bbox poligonal a rectangular
+                # Extraer todas las coordenadas X e Y
+                x_coords = [point[0] for point in bbox_poly]
+                y_coords = [point[1] for point in bbox_poly]
 
-                # Confianza
-                confidence = row['conf'] / 100.0 if row['conf'] >= 0 else 0.0
+                # Bbox rectangular: [x_min, y_min, x_max, y_max]
+                x0 = min(x_coords)
+                y0 = min(y_coords)
+                x1 = max(x_coords)
+                y1 = max(y_coords)
 
-                # Normalizar coordenadas
+                # Normalizar coordenadas a escala 0-1000
                 bbox = self._normalize_bbox(
                     [x0, y0, x1, y1],
                     img_width,
@@ -115,11 +143,11 @@ class OCRExtractor:
                     "page": page_num
                 })
 
-            logger.debug(f"Extraídas {len(result)} palabras de página {page_num} (OCR)")
+            logger.debug(f"Extraídas {len(result)} palabras de página {page_num} (PaddleOCR)")
             return result
 
         except Exception as e:
-            logger.error(f"Error al extraer con OCR de {pdf_path}: {e}")
+            logger.error(f"Error al extraer con PaddleOCR de {pdf_path}: {e}")
             raise
 
     def extract_all_pages(self, pdf_path: str) -> Dict[int, List[Dict]]:
